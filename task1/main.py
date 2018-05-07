@@ -3,7 +3,7 @@ import numpy as np
 
 from scipy.fftpack import fft, ifft
 from scipy.io import wavfile
-from scipy.signal import butter, firwin, lfilter
+from scipy.signal import butter, firwin, lfilter, hann
 
 
 def main():
@@ -15,9 +15,7 @@ def main():
     data_len = round(data.shape[0] / rate)
     data_fft = fft(data, n=int(data_len * rate))
 
-    lowcut = 500.0
-    highcut = 1500.0
-    data_filtered = firwin_hamming_filter(data_fft, lowcut, highcut, rate)
+    data_filtered = signal_filtered(rate, data_fft)
 
     plt.plot(np.abs(data_fft), label='Noisy signal')
     plt.plot(np.abs(data_filtered), label='Filtered signal')
@@ -27,6 +25,19 @@ def main():
         '{}.wav'.format(wav_file + '_filtered'),
         rate, fp2pcm(data_filtered, dtype_pcm))
     plt.show()
+
+
+def signal_filtered(rate, data_fft, lowcut=500.0, highcut=1500.0):
+    frame_len = int(2 * round(rate / 200))
+    data_filtered = np.zeros(len(data_fft), dtype=np.complex)
+
+    wnd = hann(frame_len)
+    #frame_len *= wnd
+
+    for ind in range(0, len(data_fft) - frame_len, frame_len):
+        data_filtered[ind:ind + frame_len] = firwin_hamming_filter(
+            data_fft[ind:ind + frame_len], lowcut, highcut, rate)
+    return data_filtered
 
 
 def norm4fp(dtype):
@@ -49,18 +60,6 @@ def pcm2fp(data_pcm):
 def fp2pcm(data_fp, dtype_pcm):
     data_pcm = np.around(np.real(ifft(data_fp)) * norm4fp(dtype_pcm))
     return data_pcm.astype(dtype_pcm, order='C')
-
-
-def butter_bandpass(lowcut, highcut, rate, order=5):
-    nyq = rate / 2
-    low = lowcut / nyq
-    high = highcut / nyq
-    return butter(order, [low, high], btype='bandpass')
-
-
-def butter_bandpass_filter(data, lowcut, highcut, rate, order=5):
-    b, a = butter_bandpass(lowcut, highcut, rate, order=order)
-    return lfilter(b, a, data)
 
 
 def firwin_hamming(lowcut, highcut, rate, order=3):
